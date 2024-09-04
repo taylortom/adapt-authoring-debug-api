@@ -111,7 +111,7 @@ define(function(require){
         $('.data').removeClass('error');
         if(body) body = JSON.parse(body);
         const res = await $.ajax(url, { method, data: body, dataType: 'json' });
-        data = res;
+        data = res || 'No response data.';
       } catch(e) {
         data = e.responseJSON || e.toString();
         isError = true
@@ -119,7 +119,7 @@ define(function(require){
       $('.data')
         .toggleClass('error', !!isError)
         .text(JSON.stringify(data, null, 2))
-        .show();
+        .toggle(data);
     }
   }, {
     template: 'api'
