@@ -8,8 +8,8 @@ define(function(require){
     tagName: 'div',
     className: 'api',
     events: {
-      'change #router': 'onRouterChange',
-      'change #route': 'onRouteChange',
+      'change #router': 'renderRouteOptions',
+      'change #route': 'renderMethodOptions',
       'change #route,#router,#method': 'updateUrl',
       'click button.send': 'onButtonClicked'
     },
@@ -19,17 +19,12 @@ define(function(require){
 
       this.apiUrl = `${window.location.origin}/api/`;
       const apiMap = await $.get(this.apiUrl);
-      const $router = $('#router');
-
-      $router.append(`<option value="${UNDEF_VAL}">Select a router</option`);
       
-      this.data = Object.values(apiMap).reduce((mapped, routes) => {
-        
+      this.data = Object.values(apiMap).reduce((mapped, routes) => { 
         let router = routes[0].url.replace(this.apiUrl, '');
         router = router.slice(0, router.indexOf('/'));
         
         const routePrefix = `${window.location.origin}/api/${router}/`;
-        $router.append(`<option value="${router}">${router}</option`);
         
         return Object.assign(mapped, {
           [router]: routes.map(r => {
@@ -40,27 +35,19 @@ define(function(require){
           })
         });
       }, {});
+
+      this.renderRouterOptions();
     },
 
-    updateUrl: function() {
-      const { router, route, method } = this.getData();
-      if(route === UNDEF_VAL) $('#method').val(UNDEF_VAL);
-      $('#url').val(router !== UNDEF_VAL && route !== UNDEF_VAL && method !== UNDEF_VAL ? `${this.apiUrl}${router}/${route}` : UNDEF_VAL);
-      $('.body').toggle(method === 'POST' || method === 'PATCH' || method === 'PUT');
-      $('.data').hide();
-    },
+    renderRouterOptions: function() {
+      const $router = $('#router');
+      $router.empty();
+      $router.append(`<option value="${UNDEF_VAL}">Select a router</option`);
 
-    getData: function() {
-      return {
-        router: $('#router').val(),
-        route: $('#route').val(),
-        method: $('#method').val(),
-        url: $('#url').val(),
-        body: $('#body').val()
-      };
+      Object.keys(this.data).forEach(k => $router.append(`<option value="${k}">${k}</option`));
     },
     
-    onRouterChange: async function() {
+    renderRouteOptions: async function() {
       const { router } = this.getData();
 
       if(router === UNDEF_VAL) {
@@ -72,15 +59,15 @@ define(function(require){
       $route.show();
       
       const routes = this.data[router];
-      routes.forEach(r => $route.append(`<option value="${r.route}">${r.route}</option`));
+      routes.forEach(r => $route.append(`<option value="${r.route}">${r.route || '/'}</option`));
 
       if(routes.length === 1) {
         $route.val(routes[0].route);
-        this.onRouteChange();
+        this.renderMethodOptions();
       }
     },
     
-    onRouteChange: async function() {
+    renderMethodOptions: async function() {
       const { router, route } = this.getData();
       
       if(router === UNDEF_VAL || route === UNDEF_VAL) {
@@ -96,16 +83,37 @@ define(function(require){
       if(data.accepted_methods.length === 1) $method.val(data.accepted_methods[0]);
     },
 
+    updateUrl: function() {
+      const { router, route, method } = this.getData();
+      if(route === UNDEF_VAL) $('#method').val(UNDEF_VAL);
+
+      const areValsSet = router !== UNDEF_VAL && route !== UNDEF_VAL && method !== UNDEF_VAL;
+
+      $('#url').val(areValsSet ? `${this.apiUrl}${router}${route ? '/' : ''}${route}` : "");
+      $('.body').toggle(method === 'POST' || method === 'PATCH' || method === 'PUT');
+      $('.data').hide();
+    },
+
+    getData: function() {
+      return {
+        router: $('#router').val(),
+        route: $('#route').val(),
+        method: $('#method').val(),
+        url: $('#url').val(),
+        body: $('#body').val()
+      };
+    },
+
     onButtonClicked: async function() {
       let { url, method, body } = this.getData();
       let data, isError;
       try {
         $('.data').removeClass('error');
         if(body) body = JSON.parse(body);
-        const res = await $.ajax(url, { method, body });
+        const res = await $.ajax(url, { method, data: body, dataType: 'json' });
         data = res;
       } catch(e) {
-        data = e.responseJSON || e;
+        data = e.responseJSON || e.toString();
         isError = true
       }
       $('.data')
