@@ -1,7 +1,8 @@
 // LICENCE https://github.com/adaptlearning/adapt_authoring/blob/master/LICENSE
 define(function(require){
-  var Backbone = require('backbone');
   var OriginView = require('core/views/originView');
+
+  const UNDEF_VAL = 'undefined';
 
   var ApiView = OriginView.extend({
     tagName: 'div',
@@ -20,9 +21,9 @@ define(function(require){
       const apiMap = await $.get(this.apiUrl);
       const $router = $('#router');
 
-      $router.append(`<option value="">Select a router</option`);
+      $router.append(`<option value="${UNDEF_VAL}">Select a router</option`);
       
-      this.data = Object.entries(apiMap).reduce((mapped, [key, routes]) => {
+      this.data = Object.values(apiMap).reduce((mapped, routes) => {
         
         let router = routes[0].url.replace(this.apiUrl, '');
         router = router.slice(0, router.indexOf('/'));
@@ -32,8 +33,10 @@ define(function(require){
         
         return Object.assign(mapped, {
           [router]: routes.map(r => {
-            const route = r.url.replace(routePrefix, '');
-            return Object.assign(r, { route });
+            return {
+              route: r.url.replace(routePrefix, ''),
+              accepted_methods: Object.keys(r.accepted_methods).map(m => m.toUpperCase())
+            };
           })
         });
       }, {});
@@ -41,8 +44,10 @@ define(function(require){
 
     updateUrl: function() {
       const { router, route, method } = this.getData();
-      $('#url').val(router && route && method ? `${this.apiUrl}${router}/${route}` : '');
-      $('.body').toggle(method === 'post' || method === 'patch' || method === 'put');
+      if(route === UNDEF_VAL) $('#method').val(UNDEF_VAL);
+      $('#url').val(router !== UNDEF_VAL && route !== UNDEF_VAL && method !== UNDEF_VAL ? `${this.apiUrl}${router}/${route}` : UNDEF_VAL);
+      $('.body').toggle(method === 'POST' || method === 'PATCH' || method === 'PUT');
+      $('.data').hide();
     },
 
     getData: function() {
@@ -58,33 +63,37 @@ define(function(require){
     onRouterChange: async function() {
       const { router } = this.getData();
 
-      if(!router) {
+      if(router === UNDEF_VAL) {
         return;
       }
       const $route = $('#route');
       $route.empty();
-      $route.append(`<option value="">Select a route</option`);
+      $route.append(`<option value="${UNDEF_VAL}">Select a route</option`);
       $route.show();
       
-      this.data[router].forEach(r => $route.append(`<option value="${r.route}">${r.route}</option`));
+      const routes = this.data[router];
+      routes.forEach(r => $route.append(`<option value="${r.route}">${r.route}</option`));
+
+      if(routes.length === 1) {
+        $route.val(routes[0].route);
+        this.onRouteChange();
+      }
     },
     
     onRouteChange: async function() {
       const { router, route } = this.getData();
       
-      if(!router || !route) {
+      if(router === UNDEF_VAL || route === UNDEF_VAL) {
         return;
       }
       const data = this.data[router].find(r => r.route === route);
       const $method = $('#method');
       $method.empty();
-      $method.append(`<option value="">Select HTTP method</option`);
-      const methods = Object.keys(data.accepted_methods);
-      methods.forEach(m => {
-        m = m.toUpperCase();
-        $method.append(`<option value="${m}" ${methods.length === 1 ? 'selected="true"' : ''}>${m}</option`);
-      });
+      $method.append(`<option value="${UNDEF_VAL}">Select HTTP method</option`);
+      data.accepted_methods.forEach(m => $method.append(`<option value="${m}">${m}</option`));
       $method.show();
+
+      if(data.accepted_methods.length === 1) $method.val(data.accepted_methods[0]);
     },
 
     onButtonClicked: async function() {
@@ -100,8 +109,8 @@ define(function(require){
         isError = true
       }
       $('.data')
-        .toggleClass('error', isError)
-        .html(JSON.stringify(data, null, 2))
+        .toggleClass('error', !!isError)
+        .text(JSON.stringify(data, null, 2))
         .show();
     }
   }, {
