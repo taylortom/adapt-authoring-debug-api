@@ -27,12 +27,12 @@ define(function(require){
         const routePrefix = `${window.location.origin}/api/${router}/`;
         
         return Object.assign(mapped, {
-          [router]: routes.map(r => {
+          [router]: (mapped[router] ?? []).concat(routes.map(r => {
             return {
               route: r.url.replace(routePrefix, ''),
               accepted_methods: Object.keys(r.accepted_methods).map(m => m.toUpperCase())
             };
-          })
+          }))
         });
       }, {});
 
